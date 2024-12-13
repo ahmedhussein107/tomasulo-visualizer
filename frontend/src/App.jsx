@@ -49,6 +49,7 @@ function App() {
                 tokens.shift();
             }
             tokens = tokens[0].split(",");
+            console.log(tokens);
             let first = tokens[0].split(" ").filter((token) => token !== "");
             const opCode = first[0];
             const op1 = first[1];
@@ -504,7 +505,9 @@ function App() {
 
             {/* Clock Cycle and Current Instruction */}
             <Typography variant="h6">Clock Cycle: {views.at(-1).clockCycle}</Typography>
-            <Typography variant="h6">Current Instruction: {views.at(-1).pc}</Typography>
+            <Typography variant="h6">
+                Current Instruction: {views.at(-1).pc - 1}
+            </Typography>
 
             <Box sx={{ display: "flex", gap: "5%", width: "100%" }}>
                 <Box sx={{ display: "flex", flexDirection: "column", width: "30%" }}>
