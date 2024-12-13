@@ -25,7 +25,7 @@ function App() {
 	const [latencies, setLatencies] = useState({});
 	const [blockSize, setBlockSize] = useState(3); // TODO: read it from file
 
-	const cacheLatency = 2;
+	const cacheLatency = blockSize * 2;
 	const parseCode = (code) => {
 		let tags = new Map();
 		code.map((line, index) => {
@@ -236,6 +236,15 @@ function App() {
 		return { station, index };
 	};
 
+	const findWordInCache = (view, address) => {
+		const blockNum = address / (blockSize * 4);
+		const offset = address % (blockSize * 4);
+		let index = view.cache.findIndex((cache) => cache.blockNum === blockNum);
+		if (index !== -1) return true;
+		cache.push({ blockNum, block: new Array(blockSize).fill(0) });
+		return false;
+	};
+
 	const execute = (view) => {
 		// who would start
 		for (let instruction of view.instructionTable) {
@@ -250,20 +259,16 @@ function App() {
 			instruction.start = view.clockCycle + 1;
 			instruction.end = view.clockCycle + latencies[instruction.opCode];
 			if (station === "LW" || station === "SW") {
-				const blockNum = reservationStation[index].address / (blockSize * 4);
-				const offset = reservationStation[index].address % (blockSize * 4);
-				let found = false;
-				for (let singleCache of view.cache) {
-					if (singleCache.blockNum === blockNum) {
-						found = true;
-						break;
-					}
+				if (!findWordInCache(view, instruction.address)) {
+					instruction.end += cacheLatency;
 				}
-				if (!found) {
-					if (instruction.opCode.includes("D") && offset === blockSize - 1) {
-						instruction.end += 2 * cacheLatency;
-						cache.push({ blockNum, block: [] });
-					} else {
+				if (
+					instruction.opCode === "L.D" ||
+					instruction.opCode === "LD" ||
+					instruction.opCode === "S.D" ||
+					instruction.opCode === "SD"
+				) {
+					if (!findWordInCache(view, instruction.address + 4)) {
 						instruction.end += cacheLatency;
 					}
 				}
@@ -282,7 +287,7 @@ function App() {
 		if (stationName === "BR") {
 			if (station[index].op === "BEQ") {
 				if (station[index].vj === station[index].vk) {
-					view.pc = station[index].address;
+					view.pc = station[index].address === null;
 				}
 			} else {
 				if (station[index].vj !== station[index].vk) {
@@ -334,17 +339,71 @@ function App() {
 				return { tag, value: 0 };
 			}
 		}
-		if (stationName === "LW") {
-			const blockNum = station[index].address / (blockSize * 4);
-			const offset = station[index].address % (blockSize * 4);
-			for (let singleCache of view.cache) {
-				if (singleCache.blockNum === blockNum) {
-					return { tag, value: singleCache.block[offset] };
+		const fetchWordFromCache = (view, address) => {
+			const blockNum = address / (blockSize * 4);
+			const offset = address % (blockSize * 4);
+			let index = view.cache.findIndex((cache) => cache.blockNum === blockNum);
+			if (index === -1) return 0;
+			return Number(view.cache[index].block[offset] & 0xffffffffn);
+		};
+
+		const fetchFromCache = (address, inc) => {
+			let value = 0;
+			for (let i = 0; i < inc; i++) {
+				value = value * Math.pow(2, 32) + fetchWordFromCache(view, address);
+				address += inc;
+			}
+			return value;
+		};
+
+		const storeInCache = (address, value, isDoubleWord) => {
+			const blockNum = Math.floor(address / (blockSize * 4));
+			const offset = address % (blockSize * 4);
+
+			if (!view.cache) {
+				view.cache = []; // Initialize cache if not already done
+			}
+
+			let index = view.cache.findIndex((cache) => cache.blockNum === blockNum);
+
+			// Ensure value is BigInt for 64-bit handling
+			const valueBigInt = BigInt(value);
+
+			if (index !== -1) {
+				// Block found, update the value(s)
+				view.cache[index].block[offset] = Number((valueBigInt >> 32n) & 0xffffffffn); // Upper 32 bits
+				if (isDoubleWord) {
+					storeInCache(address + 4, Number(valueBigInt & 0xffffffffn), false);
+				}
+			} else {
+				// Block not found, create a new block
+				const newBlock = {
+					blockNum: blockNum,
+					block: new Array(blockSize * 4).fill(0),
+				};
+				newBlock.block[offset] = Number((valueBigInt >> 32n) & 0xffffffffn); // Lower 32 bits
+				view.cache.push(newBlock);
+				if (isDoubleWord) {
+					storeInCache(address + 4, Number(valueBigInt & 0xffffffffn), false);
 				}
 			}
-			return { tag, value: 0 };
+		};
+
+		if (stationName === "LW") {
+			return {
+				tag,
+				value: fetchFromCache(
+					station[index].address === null ? station[index].vj : station[index].address,
+					station[index].op === "L.D" || station[index].op === "LD" ? 2 : 1
+				),
+			};
 		}
 		if (stationName === "SW") {
+			storeInCache(
+				station[index].address === null ? station[index].vk : station[index].address,
+				station[index].vj,
+				station[index].op === "S.D" || station[index].op === "SD"
+			);
 			return { tag, value: 0 };
 		}
 		return { tag: "AbdElRaheem", value: "Gamadan Overflow" };
