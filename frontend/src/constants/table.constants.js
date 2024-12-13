@@ -34,7 +34,7 @@ export const instructionColumns = [
 export const cacheColumns = [
     { field: "id", headerName: "Cache", width: 120 },
     { field: "blockNum", headerName: "Block", width: 120 },
-    { field: "Block", headerName: "Value", width: 120 },
+    { field: "block", headerName: "Value", width: 120 },
 ];
 
 // Columns for reservation stations
