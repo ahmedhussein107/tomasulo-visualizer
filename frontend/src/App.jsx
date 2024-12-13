@@ -10,6 +10,8 @@ import {
 	branchColumns,
 	loadColumns,
 	storeColumns,
+	codeColumns,
+	instructionColumns,
 } from "./constants/table.constants";
 
 import { stationsTemplates } from "./constants/stations.constants";
@@ -124,6 +126,7 @@ function App() {
 	};
 
 	useEffect(() => {
+		setIsLoading(false);
 		let view = {
 			clockCycle: 0,
 			pc: 0,
@@ -218,22 +221,16 @@ function App() {
 		// console.log(view);
 	}, []);
 
-	// useEffect(() => {
-	//     if (views.length === 0) return;
-	//     if (code.length === 0) return;
-	//     issue(views.at(-1));
-	//     console.log(views.at(-1));
-	// }, [views, code]);
+	useEffect(() => {
+		if (views.length === 0) return;
+		if (code.length === 0) return;
+		console.log(views[0]);
+		setIsLoading(false);
+	}, [views, code]);
 
 	const stepBack = () => {
 		if (views.length === 1) return;
 		setViews(views.slice(0, -1));
-	};
-
-	const destructeStationId = (stationId) => {
-		let station = stationId.slice(0, 2);
-		let index = stationId.slice(2);
-		return { station, index };
 	};
 
 	const findWordInCache = (view, address) => {
@@ -534,6 +531,8 @@ function App() {
 		setViews([...views, view]);
 	};
 
+	if (isLoading) return <h1>...Loading</h1>;
+
 	return (
 		<Box
 			sx={{
@@ -548,49 +547,188 @@ function App() {
 			</Typography>
 
 			{/* Clock Cycle and Current Instruction */}
-			<Typography variant="h6">Clock Cycle: {clockCycle}</Typography>
-			<Typography variant="h6">Current Instruction:</Typography>
+			<Typography variant="h6">Clock Cycle: {views.at(-1).clockCycle}</Typography>
+			<Typography variant="h6">Current Instruction: {views.at(-1).pc}</Typography>
 
 			<Box sx={{ display: "flex", gap: "5%", width: "100%" }}>
 				<Box sx={{ display: "flex", flexDirection: "column", width: "30%" }}>
 					{/* Code in a table */}
-					<h1>This is Code</h1>
+					<Table
+						rows={code.map((instruction, index) => ({
+							id: index,
+							...instruction,
+						}))}
+						columns={codeColumns}
+						title="Code"
+					/>
 					{/* Instructions table */}
-					<h1>This is Instructions</h1>
+					<Table
+						rows={views.at(-1).instructionTable.map((instruction, index) => {
+							return {
+								id: index,
+								issue: instruction.issue,
+								station: instruction.station,
+								opCode: instruction.opCode,
+								op1: instruction.op1,
+								op2: instruction.op2,
+								op3: instruction.op3,
+								address: instruction.address,
+								start: instruction.start,
+								end: instruction.end,
+								"write result": instruction["write result"],
+							};
+						})}
+						columns={instructionColumns}
+						title="Instructions"
+					/>
 				</Box>
 				<Box sx={{ display: "flex", flexDirection: "column", width: "65%" }}>
 					<Box sx={{ display: "flex", gap: "2%" }}>
 						{/* Integer Register File */}
-						<h1>This is Integer Register File</h1>
+						<Table
+							rows={views.at(-1).integerRegs.map((reg, index) => {
+								return {
+									id: index,
+									q: reg.q,
+									v: reg.v,
+								};
+							})}
+							columns={registerColumns}
+							title="Integer Register File"
+						/>
 						{/* Floating Point Register File */}
-						<h1>This is Floating Point Register File</h1>
+						<Table
+							rows={views.at(-1).floatingPointRegs.map((reg, index) => {
+								return {
+									id: index,
+									q: reg.q,
+									v: reg.v,
+								};
+							})}
+							columns={registerColumns}
+							title="Floating Point Register File"
+						/>
 						{/* Cache */}
-						<h1>This is Cache</h1>
+						<Table rows={views.at(-1).cache} columns={cacheColumns} title="Cache" />
 					</Box>
 					<Box sx={{}}>
 						{/* Integer Add/Sub Reservation Stations */}{" "}
-						<h1>This is Integer Add/Sub Reservation Stations</h1>
+						<Table
+							rows={views.at(-1).reservationStations["IA"].map((station, index) => {
+								return {
+									id: index,
+									busy: station.busy,
+									op: station.op,
+									vj: station.vj,
+									vk: station.vk,
+									qj: station.qj,
+									qk: station.qk,
+									address: station.address,
+								};
+							})}
+							columns={reservationColumns}
+							title="Integer Add/Sub Reservation Stations"
+						/>
 					</Box>
 					<Box sx={{}}>
 						{/* Floating point Add/Sub Reservation Stations */}{" "}
-						<h1>This is Floating point Add/Sub Reservation Stations</h1>
+						<Table
+							rows={views.at(-1).reservationStations["FA"].map((station, index) => {
+								return {
+									id: index,
+									busy: station.busy,
+									op: station.op,
+									vj: station.vj,
+									vk: station.vk,
+									qj: station.qj,
+									qk: station.qk,
+									address: station.address,
+								};
+							})}
+							columns={reservationColumns}
+							title="Floating point Add/Sub Reservation Stations"
+						/>
 					</Box>
 					<Box sx={{}}>
 						{/* Floating point Multiply/Divide Reservation Stations */}{" "}
-						<h1>This is Floating point Multiply/Divide Reservation Stations</h1>
+						<Table
+							rows={views.at(-1).reservationStations["FM"].map((station, index) => {
+								return {
+									id: index,
+									busy: station.busy,
+									op: station.op,
+									vj: station.vj,
+									vk: station.vk,
+									qj: station.qj,
+									qk: station.qk,
+									address: station.address,
+								};
+							})}
+							columns={reservationColumns}
+							title="Floating point Multiply/Divide Reservation Stations"
+						/>
 					</Box>
 					<Box sx={{}}>
 						{/* Branch Reservation Stations */}{" "}
-						<h1>This is Branch Reservation Stations</h1>
+						<Table
+							rows={views.at(-1).reservationStations["BR"].map((station, index) => {
+								return {
+									id: index,
+									busy: station.busy,
+									op: station.op,
+									vj: station.vj,
+									vk: station.vk,
+									qj: station.qj,
+									qk: station.qk,
+									address: station.address,
+								};
+							})}
+							columns={branchColumns}
+							title="Branch Reservation Stations"
+						/>
 					</Box>
 					<Box sx={{ display: "flex", width: "100%", gap: "2%" }}>
 						<Box>
 							{/* Load Reservation Stations */}{" "}
-							<h1>This is Load Reservation Stations</h1>
+							<Table
+								rows={views
+									.at(-1)
+									.reservationStations["LW"].map((station, index) => {
+										return {
+											id: index,
+											op: station.op,
+											busy: station.busy,
+											vj: station.vj,
+											vk: station.vk,
+											qj: station.qj,
+											qk: station.qk,
+											address: station.address,
+										};
+									})}
+								columns={loadColumns}
+								title="Load Reservation Stations"
+							/>
 						</Box>
 						<Box>
 							{/* Store Reservation Stations */}{" "}
-							<h1>This is Store Reservation Stations</h1>
+							<Table
+								rows={views
+									.at(-1)
+									.reservationStations["SW"].map((station, index) => {
+										return {
+											id: index,
+											op: station.op,
+											busy: station.busy,
+											vj: station.vj,
+											vk: station.vk,
+											qj: station.qj,
+											qk: station.qk,
+											address: station.address,
+										};
+									})}
+								columns={storeColumns}
+								title="Store Reservation Stations"
+							/>
 						</Box>
 					</Box>
 				</Box>
